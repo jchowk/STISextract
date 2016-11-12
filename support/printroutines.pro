@@ -1,0 +1,154 @@
+; Some time ago, I wrote the following short procedures to simplify the
+; process of directing IDL graphics to a PostScript printer.  There are two
+; routines, 'pso' and 'psc'.  'pso' sets the plot device to "PS", and 'psc'
+; spools the file to the printer and returns the plot device to whatever it
+; was.
+;  
+; Most commonly, I construct a graphics command (or commands) with the output
+; appearing on the screen, then type 'pso', re-execute the graphics
+; command(s) from the command buffer, and enter 'pso' to spool the graphic to
+; the printer.
+;
+; Because of the 'spawn'ed 'lpr' command and the UNIX filename syntax, these
+; are pretty specific to UNIX, however, they should be pretty easy to adapt
+; to other OSes.
+;
+; -- 
+; Geoff Sobering (Geoff.Sobering@nih.gov)
+; In Vivo NMR Research Center
+; National Institutes of Health
+
+
+
+
+
+PRO psp,filename, LONG=LongYes, HOME=HomeFileFlag, SHORT=ShortYes
+
+;  1/17/92  @(#)pso.pro 2.2  In Vivo NMR Research Center, NIH
+;  Original by Geoff Sobering.
+;  Modified 27/Oct./1994 by P. Erwin (autosets portrait mode).
+;  Modification -- default to local dir. -- C. Howk 2/Nov./1997
+
+COMMON ps_switch, old_plot_dev, ps_set, print_filename
+
+IF ( !D.NAME EQ 'PS' ) THEN BEGIN
+   message, /inform, 'PostScript output already set...setting portrait mode.'
+   erase
+   device,/portrait
+ENDIF ELSE BEGIN
+
+   ; Change the plot-device and flag to 'PS':
+   old_plot_dev = !D.NAME
+   set_plot, 'PS'
+
+   IF keyword_set(LongYes) THEN $
+      device,bits=8, /portrait, ysize=10., $
+      xsize=8.2, yoff=0.5, xoff=0.15, /inch, /color $
+   ELSE IF keyword_set(ShortYes) THEN $
+      device,bits=8, /portrait, ysize=5.5, $
+      xsize=7.5, yoff=2.5, xoff=0.5, /inch, /color $
+   ELSE $
+      device, /color, bits=8, /portrait, $
+      ysize=6.75,  xsize=7.75,  yoff=2.2,  xoff=0.38,  /inch 
+
+   ps_set = 1
+
+   IF N_PARAMS() LT 1 THEN print_filename = 'idl.ps' $
+      ELSE print_filename = filename
+
+ 	IF  KEYWORD_SET(HomeFileFlag) THEN BEGIN
+	  ; Put the file in the users home directory:
+	  device, /color, bits=8, file=getenv( 'HOME' ) + '/' + print_filename
+ 	ENDIF ELSE BEGIN
+ 	  ; Do NOT put the file in the users home directory:
+ 	  device, /color, bits=8, file=print_filename
+ 	ENDELSE
+
+      ENDELSE
+
+RETURN
+END
+
+
+PRO psl,filename,HOME=HomeFileFlag
+
+;  1/17/92  @(#)pso.pro 2.2  In Vivo NMR Research Center, NIH
+;  Original by Geoff Sobering.
+;  Modification -- landscape printing -- P. Erwin 27/Oct./1994
+;  Modification -- default to local dir. -- C. Howk 2/Nov./1997
+
+COMMON ps_switch, old_plot_dev, ps_set, print_filename
+
+IF ( !D.NAME EQ 'PS' ) THEN BEGIN
+   message, /inform, 'PostScript output already set...setting landscape mode.'
+   erase
+   device,/landscape
+ENDIF ELSE BEGIN
+
+   ; Change the plot-device and flag to 'PS':
+   old_plot_dev = !D.NAME
+   set_plot, 'PS'
+   device,/landscape, bits=8, /color, $
+    xsize=10,ysize=7.5,xoff=0.75,yoff=11-0.5,/inch
+   ps_set = 1
+
+   IF N_PARAMS() LT 1 THEN print_filename = 'idl.ps' $
+      ELSE print_filename = filename
+
+   	IF  KEYWORD_SET(HomeFileFlag) THEN BEGIN
+	  ; Put the file in the users home directory:
+	  device, /color, bits=8, file=getenv( 'HOME' ) + '/' + print_filename
+ 	ENDIF ELSE BEGIN
+ 	  ; Do NOT put the file in the users home directory:
+ 	  device, /color, bits=8, file=print_filename
+ 	ENDELSE
+
+ENDELSE
+
+RETURN
+END
+
+
+
+PRO lp,printer,HOME=HomeFileFlag, LPR=HardCopyYes
+
+;  1/17/92  @(#)psc.pro 2.2  In Vivo NMR Research Center, NIH
+;  Original by Geoff Sobering.
+;  Modifications 14/Oct./1994 by Peter Erwin.
+
+   COMMON ps_switch, old_plot_dev, ps_set, print_filename
+
+   IF ( !D.NAME EQ 'PS' ) THEN BEGIN
+      device,/close_file
+      set_plot, old_plot_dev
+      ps_set = 0
+   ENDIF ELSE BEGIN
+      old_plot_dev = !D.NAME
+      set_plot,'PS'
+      device,/close_file
+      set_plot, old_plot_dev
+      ps_set = 0
+   ENDELSE
+
+   ; Send the plot-file to the printer:
+   IF ( N_PARAMS() LT 1) THEN BEGIN
+     print_command = 'lpr '
+   ENDIF ELSE BEGIN
+     IF (printer EQ 6) OR (printer EQ 1) THEN print_command = 'lpr -Plp1 '
+     IF (printer EQ 4) THEN print_command = 'lpr -Plp5 '
+     IF (printer EQ 5) THEN print_command = 'lpr -Plp4 '
+   ENDELSE
+
+   IF KEYWORD_SET(HomeFileFlag) THEN print_command = print_command + ' $HOME/'$
+      ELSE  print_command = print_command + '' 
+
+
+   spawn_command = print_command + print_filename
+
+   IF keyword_set(HardCopyYes) THEN $
+    SPAWN,spawn_command
+   
+RETURN
+END
+
+
